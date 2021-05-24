@@ -1,5 +1,6 @@
+
 /*	Author: lab
- *  Partner(s) Name: 
+` *  Partner(s) Name: 
  *	Lab Section:
  *	Assignment: Lab #  Exercise #
  *	Exercise Description: [optional - include for your own benefit]
@@ -82,6 +83,7 @@ void TimerSet(unsigned long M){
 }
 
 
+
 unsigned char GetBit(unsigned char x, unsigned char k) {
    return ((x & (0x01 << k)) != 0);
 }
@@ -115,99 +117,146 @@ unsigned char GetKeypadKey(){
     if(GetBit(PINC,2)==0) {return('C');}
     if(GetBit(PINC,3)==0) {return('D');}
     return ('\0');
- }
-
-
-
-unsigned char led0_output = 0x00;
-unsigned char pause = 1;
-
-enum pauseButtoSM_State {pauseButton_wait, pauseButton_press, pauseButton_release};
-
- // Monitors buttons connected to PA0
- // When button is pressed, shared variable "pause" is toggled
- int pauseButtonSMTick(int state){
-     // Local Variables
-     
-     unsigned char press = GetKeypadKey();
-
-     switch(state){
-     case pauseButton_wait:
-         state = press != '\0' ? pauseButton_press: pauseButton_wait; break;
-     case pauseButton_press:
-         state = pauseButton_release; break;
-     case pauseButton_release:
-         state = press == '\0' ? pauseButton_wait: pauseButton_press; break;
-     default:
-         state = pauseButton_wait; break;
-     }
-
-     switch(state){
-     case pauseButton_wait: 
-	pause = 1;
-	break;
-     case pauseButton_press:
-         pause = 0;
-         break;
-     case pauseButton_release: break;
-     }
-     return state;
-
- }
-
-
-enum toggleLED0_States {toggleLED0_wait, toggleLED0_blink};
-
-int toggleLED0SMTick(int state){
-    switch(state){
-        case toggleLED0_wait: state = !pause? toggleLED0_blink: toggleLED0_wait; break;
-        case toggleLED0_blink: state = pause? toggleLED0_wait: toggleLED0_wait; break;
-        default: state = toggleLED0_wait; break;
-    }
-
-    switch(state){
-        case toggleLED0_wait: 
-	    led0_output = 0x00;
-            break;
-
-        case toggleLED0_blink:
-            led0_output = 0x01;
-        break;
-    }
-    return state;
 }
 
 
-enum display_States{ display_display};
+unsigned char step;
+unsigned char button;
+unsigned char light;
+enum Lock_States {Lock_Start, Lock_Reset, Lock_Held, Lock_Pound, Lock_One, Lock_Two, Lock_Three, Lock_Four, Lock_Unlock} Lock_State;
 
-int displayTickSM(int state){
-    unsigned char output;
-
-    switch(state){
-        case display_display: state = display_display; break;
-        default: state = display_display; break;
+void Door_Lock(){
+    button = GetKeypadKey();
+    switch(Lock_State){
+        case Lock_Start:
+            Lock_State = Lock_Reset;
+            break;
+        case Lock_Reset:
+            if(button == '#'){
+                Lock_State = Lock_Held;
+            } else if (button != '#'){
+                Lock_State = Lock_Reset;
+            }
+            break;
+            
+        case Lock_Held:
+            // if user releases button, select next state based on the last step.
+            // step 0 = '#', step 1 = '1', step 2 = '2',..., step 4 = '4'
+            if(button == '\0'){
+                switch(step){
+                    case 0:
+                        Lock_State = Lock_Pound;
+                        break;
+                    case 1:
+                        Lock_State = Lock_One;
+                        break;
+                    case 2:
+                        Lock_State = Lock_Two;
+                        break;
+                    case 3:
+                        Lock_State = Lock_Three;
+                        break;
+                    case 4:
+                        Lock_State = Lock_Four;
+                        break;
+                    case 5:
+                        Lock_State = Lock_Unlock;
+                        break;
+                }
+            } else
+                Lock_State = Lock_Held;
+            break;
+            
+        case Lock_Pound:
+            if(button == '1'){
+                step = 1;
+		Lock_State = Lock_Held;
+	    }
+            else if(button == '\0')
+                Lock_State = Lock_Pound;
+            else
+                Lock_State = Lock_Reset;
+            break;
+            
+        case Lock_One:
+            if(button == '2'){
+		step = 2;
+                Lock_State = Lock_Held;
+            }else if(button == '\0')
+                Lock_State = Lock_One;
+            else
+                Lock_State = Lock_Reset;
+            break;
+            
+        case Lock_Two:
+            if(button == '3'){
+                step = 3;
+		Lock_State = Lock_Held;
+            }else if(button == '\0')
+                Lock_State = Lock_Two;
+            else
+                Lock_State = Lock_Reset;
+            break;
+            
+            
+        case Lock_Three:
+            if(button == '4'){
+                step = 4;
+		Lock_State = Lock_Held;
+            }else if(button == '\0')
+                Lock_State = Lock_Three;
+            else
+                Lock_State = Lock_Reset;
+            break;
+            
+        case Lock_Four:
+            if(button == '5'){
+		step = 5;
+                Lock_State = Lock_Held;
+            }else if(button == '\0')
+                Lock_State = Lock_Four;
+            else
+                Lock_State = Lock_Reset;
+            break;
+            
+        case Lock_Unlock:
+            if(button != '\0')
+                Lock_State = Lock_Reset;
+            else
+                Lock_State = Lock_Unlock;
+            break;
+        default:
+            Lock_State = Lock_Reset;
+	    break;
     }
-
-    switch(state){
-        case display_display:
-            output = led0_output;
-        break;
+        
+    switch(Lock_State){
+        case Lock_Reset:
+            step =0;
+            light = 0x10;
+            break;
+        case Lock_Pound:
+	    light = 0x00;  
+            break;
+        case Lock_One:
+            light = 0x01;
+            break;
+        case Lock_Two:
+            light = 0x02;
+            break;
+        case Lock_Three:
+            light = 0x04;
+            break;
+        case Lock_Four:
+            light = 0x08;
+            break;
+        case Lock_Unlock:
+            light = 0x1F;
+            break;
     }
-    PORTB = output;
-    return state;
- }
-
-
-unsigned long int findGCD(unsigned long int a, unsigned long int b){
-    unsigned long int c;
-    while(1){
-    c = a%b;
-    if(c==0) {return b;}
-        a=b;
-    b=c;
-    }
-    return 0;
- }
+    PORTB = light;
+    
+}
 
  int main(void) {
      
@@ -215,46 +264,17 @@ unsigned long int findGCD(unsigned long int a, unsigned long int b){
      DDRB = 0xFF; PORTB = 0x00;
      DDRC = 0xF0; PORTC = 0x0F;
 
-     static task task1, task2, task3;
-     task *tasks[] = {&task1, &task2, &task3};
-     const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
-     const char start = -1;
-     
-     task1.state = start; // init state
-     task1.period = 25;
-     task1.elapsedTime = task1.period;
-     task1.TickFct = &pauseButtonSMTick;
-     // Task2 { toggleLED0SM}
-     task2.state = start; // init state
-     task2.period = 500;
-     task2.elapsedTime = task2.period;
-     task2.TickFct = &toggleLED0SMTick;
-     // Task3 { toggleLED1SM}
-     task3.state = start; // init state
-     task3.period = 10;
-     task3.elapsedTime = task3.period;
-     task3.TickFct = &displayTickSM;
-     
-     
-     unsigned short i;
-     unsigned long GCD = tasks[0]->period;
-     for(i = 1; i<numTasks; i++){ GCD = findGCD(GCD, tasks[i]->period);}
-
-     TimerSet(GCD);
+     Lock_State = Lock_Start;
+     TimerSet(250);
      TimerOn();
      
       while(1){
+	  Door_Lock();
 
-          for(i =0; i<numTasks; i++){
-              if(tasks[i]->elapsedTime == tasks[i]->period){
-                  tasks[i]->state = tasks[i]->TickFct(tasks[i]->state);
-                  tasks[i]->elapsedTime = 0;
-              }
-              tasks[i]->elapsedTime += GCD;
+      
+          while(!TimerFlag);
+          TimerFlag = 0;
       }
-      while(!TimerFlag);
-      TimerFlag = 0;
-      }
-      return 0;
+      
  }
 
