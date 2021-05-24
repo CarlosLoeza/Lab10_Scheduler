@@ -125,17 +125,17 @@ unsigned char button;
 unsigned char light;
 enum Lock_States {Lock_Start, Lock_Reset, Lock_Held, Lock_Pound, Lock_One, Lock_Two, Lock_Three, Lock_Four, Lock_Unlock} Lock_State;
 
-void Door_Lock(){
+int Door_Lock(int state){
     button = GetKeypadKey();
-    switch(Lock_State){
+    switch(state){
         case Lock_Start:
-            Lock_State = Lock_Reset;
+            state = Lock_Reset;
             break;
         case Lock_Reset:
             if(button == '#'){
-                Lock_State = Lock_Held;
+                state = Lock_Held;
             } else if (button != '#'){
-                Lock_State = Lock_Reset;
+                state = Lock_Reset;
             }
             break;
             
@@ -145,136 +145,209 @@ void Door_Lock(){
             if(button == '\0'){
                 switch(step){
                     case 0:
-                        Lock_State = Lock_Pound;
+                        state = Lock_Pound;
                         break;
                     case 1:
-                        Lock_State = Lock_One;
+                        state = Lock_One;
                         break;
                     case 2:
-                        Lock_State = Lock_Two;
+                        state = Lock_Two;
                         break;
                     case 3:
-                        Lock_State = Lock_Three;
+                        state = Lock_Three;
                         break;
                     case 4:
-                        Lock_State = Lock_Four;
+                        state = Lock_Four;
                         break;
                     case 5:
-                        Lock_State = Lock_Unlock;
+                        state = Lock_Unlock;
                         break;
                 }
             } else
-                Lock_State = Lock_Held;
+                state = Lock_Held;
             break;
             
         case Lock_Pound:
             if(button == '1'){
                 step = 1;
-		Lock_State = Lock_Held;
+		state = Lock_Held;
 	    }
             else if(button == '\0')
-                Lock_State = Lock_Pound;
+                state = Lock_Pound;
             else
-                Lock_State = Lock_Reset;
+                state = Lock_Reset;
             break;
             
         case Lock_One:
             if(button == '2'){
 		step = 2;
-                Lock_State = Lock_Held;
+                state = Lock_Held;
             }else if(button == '\0')
-                Lock_State = Lock_One;
+                state = Lock_One;
             else
-                Lock_State = Lock_Reset;
+                state = Lock_Reset;
             break;
             
         case Lock_Two:
             if(button == '3'){
                 step = 3;
-		Lock_State = Lock_Held;
+		state = Lock_Held;
             }else if(button == '\0')
-                Lock_State = Lock_Two;
+                state = Lock_Two;
             else
-                Lock_State = Lock_Reset;
+                state = Lock_Reset;
             break;
             
             
         case Lock_Three:
             if(button == '4'){
                 step = 4;
-		Lock_State = Lock_Held;
+		state = Lock_Held;
             }else if(button == '\0')
-                Lock_State = Lock_Three;
+                state = Lock_Three;
             else
-                Lock_State = Lock_Reset;
+                state = Lock_Reset;
             break;
             
         case Lock_Four:
             if(button == '5'){
 		step = 5;
-                Lock_State = Lock_Held;
+                state = Lock_Held;
             }else if(button == '\0')
-                Lock_State = Lock_Four;
+                state = Lock_Four;
             else
-                Lock_State = Lock_Reset;
+                state = Lock_Reset;
             break;
             
         case Lock_Unlock:
-            if(button != '\0')
-                Lock_State = Lock_Reset;
-            else
-                Lock_State = Lock_Unlock;
+            if(button != '\0'){
+		step = 0;
+                state = Lock_Reset;
+            }else
+                state = Lock_Unlock;
             break;
         default:
-            Lock_State = Lock_Reset;
+            state = Lock_Reset;
 	    break;
     }
         
-    switch(Lock_State){
+    switch(state){
         case Lock_Reset:
             step =0;
-            light = 0x10;
             break;
         case Lock_Pound:
-	    light = 0x00;  
             break;
         case Lock_One:
-            light = 0x01;
             break;
         case Lock_Two:
-            light = 0x02;
             break;
         case Lock_Three:
-            light = 0x04;
             break;
         case Lock_Four:
-            light = 0x08;
             break;
         case Lock_Unlock:
-            light = 0x1F;
             break;
     }
-    PORTB = light;
-    
+    return state;
 }
 
- int main(void) {
-     
-     /* Insert DDR and PORT initializations */
-     DDRB = 0xFF; PORTB = 0x00;
-     DDRC = 0xF0; PORTC = 0x0F;
-
-     Lock_State = Lock_Start;
-     TimerSet(250);
-     TimerOn();
-     
-      while(1){
-	  Door_Lock();
-
-      
-          while(!TimerFlag);
-          TimerFlag = 0;
-      }
-      
+enum toggleLED0_States {toggleLED0_Off, toggleLED0_On};
+unsigned char led0_output;
+int toggleLED0SMTick(int state){
+    switch(state){
+        case toggleLED0_Off: state = (step==5)? toggleLED0_On: toggleLED0_Off; break;
+        case toggleLED0_On: state = (step ==5)? toggleLED0_On: toggleLED0_Off; break;
+        default: state = toggleLED0_Off; break;
+    }
+    
+    switch(state){
+	case toggleLED0_Off:
+	    led0_output = 0x00;
+	    break;
+        case toggleLED0_On:
+            led0_output = 0x01;
+            break;
+     }
+     return state;
  }
+
+
+enum display_States{ display_display};
+
+int displayTickSM(int state){
+    unsigned char output;
+    switch(state){
+         case display_display: state = display_display; break;
+         default: state = display_display; break;
+     }
+
+     switch(state){
+         case display_display:
+             output = led0_output;
+         break;
+     }
+     PORTB = output;
+     return state;
+}
+
+unsigned long int findGCD(unsigned long int a, unsigned long int b){
+    unsigned long int c;
+    while(1){
+    	c = a%b;
+     	if(c==0) {return b;}
+        a=b;
+     	b=c;
+    }
+    return 0;
+ }
+
+
+int main(void) {
+     
+    /* Insert DDR and PORT initializations */
+    DDRB = 0xFF; PORTB = 0x00;
+    DDRC = 0xF0; PORTC = 0x0F;
+
+    static task task1, task2, task3;
+    task *tasks[] = {&task1, &task2, &task3};
+    const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
+    const char start = -1;
+
+    task1.state = start; // init state
+    task1.period = 25;
+    task1.elapsedTime = task1.period;
+    task1.TickFct = &Door_Lock;
+    // Task2 { toggleLED0SM}
+    task2.state = start; // init state
+    task2.period = 500;
+    task2.elapsedTime = task2.period;
+    task2.TickFct = &toggleLED0SMTick;
+    // Task3 { toggleLED1SM}
+    task3.state = start; // init state
+    task3.period = 10;
+    task3.elapsedTime = task3.period;
+    task3.TickFct = &displayTickSM;     
+      
+    unsigned short i;
+    unsigned long GCD = tasks[0]->period;
+    for(i = 1; i<numTasks; i++){ GCD = findGCD(GCD, tasks[i]->period);}
+
+    	TimerSet(GCD);
+      	TimerOn();
+
+       	while(1){
+
+            for(i =0; i<numTasks; i++){
+            	if(tasks[i]->elapsedTime == tasks[i]->period){
+                    tasks[i]->state = tasks[i]->TickFct(tasks[i]->state);
+                    tasks[i]->elapsedTime = 0;
+                }
+                tasks[i]->elapsedTime += GCD;
+        }
+        while(!TimerFlag);
+        TimerFlag = 0;
+    }
+  
+
+}
 
