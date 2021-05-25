@@ -109,14 +109,14 @@ void TimerSet(unsigned long M){
 enum Power_States {Power_Off,Power_On} Power_State;
 enum Sound_States {Sound_Wait, Sound_One, Sound_Two, Sound_Three, Sound_Four, Sound_Five} Sound_State;
 
-unsigned char power_status;
+unsigned char power_status =0;
 
 void Power(){
     switch(Power_State){
         case Power_Off:
             if(button == 1)
                 Power_State = Power_On;
-            else
+            else if(button != 1)
                 Power_State = Power_Off;
             break;
             
@@ -152,9 +152,9 @@ void Music_Beat(){
     
     switch(Sound_State){
         case Sound_Wait:
-            if(power_status)
+            if(power_status == 1)
                 Sound_State = Sound_One;
-            else if (power_status)
+            else if (power_status == 0)
                 Sound_State = Sound_Wait;
             break;
         case Sound_One:
@@ -222,7 +222,7 @@ int main(void){
     TimerOn();
     while (1)
         {
-            button = ~PINA & 0x01;
+            button = ~PINA & 0x0F;
 	    Power();
             Music_Beat();
 
